@@ -1,0 +1,2 @@
+use std::io::{Read,Write};
+fn main(){let mut t=String::new();std::io::stdin().lock().read_to_string(&mut t).unwrap();let mut it=t.lines();let n:i32=it.next().unwrap().trim().parse().unwrap();let o=std::io::stdout();let mut w=std::io::BufWriter::with_capacity(65536,o.lock());let mut s=0i32;for _ in 0..n{let x:i32=it.next().unwrap().trim().parse().unwrap();s=(s+x)%1000003;writeln!(w,"{}",x*2+1).unwrap();}writeln!(w,"{}",s).unwrap();}

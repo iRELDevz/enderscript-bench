@@ -1,0 +1,1 @@
+fn main(){let mut f=vec![0i32;1000001];let mut c=0i32;for _ in 0..20 {for i in 1..=1000000usize {f[i]=0;}for i in 2..=1000usize {if f[i]==0{let mut p=i*i;while p<=1000000{f[p]=1;p+=i;}}}for i in 2..=1000000usize {if f[i]==0{c+=1;}}}println!("{}",c);}
