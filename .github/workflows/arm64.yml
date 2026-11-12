@@ -1,0 +1,79 @@
+name: arm64
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: iRELDevz/enderscript
+          ref: ${{ vars.ES_REF || 'main' }}
+          path: es
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+      - name: build compiler
+        shell: pwsh
+        run: |
+          $out = 'es/build/windows-arm64'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $def = @('LIBRARY kernel32.dll', 'EXPORTS', 'GetCommandLineA', 'GetStdHandle', 'WriteFile', 'ReadFile', 'CreateFileA', 'GetFileSizeEx', 'CloseHandle', 'ExitProcess', 'CreateProcessA', 'WaitForSingleObject', 'GetExitCodeProcess', 'CreateDirectoryA', 'VirtualAlloc', 'DeleteFileA')
+          Set-Content -Path "$out/k.def" -Value $def -Encoding ascii
+          zig dlltool -m arm64 -d "$out/k.def" -l "$out/libkernel32.a"
+          $objs = @()
+          foreach ($f in Get-ChildItem es/windows/arm64 -Filter *.S) {
+            $o = "$out/$($f.BaseName).o"
+            zig cc -target aarch64-windows-gnu -DTARGET_WINDOWS -c $f.FullName -o $o
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+            $objs += $o
+          }
+          zig lld-link -nologo -entry:start -subsystem:console -nodefaultlib "-out:$out/ender.exe" @objs "$out/libkernel32.a"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ender-arm64
+          path: es/build/windows-arm64/ender.exe
+
+  test:
+    needs: build
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ender-arm64
+          path: .
+      - name: version
+        shell: pwsh
+        run: ./ender.exe --version
+      - name: test suite
+        shell: pwsh
+        run: ./tests/run_tests.ps1 -Compiler ./ender.exe
+
+  bench:
+    needs: test
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ender-arm64
+          path: .
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: bench
+        shell: pwsh
+        run: ./bench.ps1 -Arch arm64 -Ender ./ender.exe -Runs 5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-arm64
+          path: results-arm64.json
